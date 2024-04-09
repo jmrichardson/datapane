@@ -1,0 +1,11 @@
+/docs
+/docs1
+
+/src/datapane/resources/local_report/local-report-base.*
+/src/datapane/resources/local_report/vue.*.js
+/src/datapane/resources/local_report/report
+/src/datapane/resources/local_report/report/**
+
+.hypothesis/
+
+*-project/

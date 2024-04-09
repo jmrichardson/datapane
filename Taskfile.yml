@@ -1,0 +1,78 @@
+version: '3'
+
+includes:
+
+vars:
+  PYTHON: poetry run python
+  PYTEST: "{{.PYTHON}} -m pytest"
+
+  POETRY_SKIP_INSTALL: ""
+
+  # assign defaults to our test configurations
+  ## for use by cypress
+  DP_TEST_SERVER: '{{.DP_TEST_SERVER | default "http://localhost:8090"}}'
+  DP_TEST_TOKEN: '{{.DP_TEST_TOKEN | default ""}}'
+  DP_TEST_PASSWORD: '{{.DP_TEST_PASSWORD | default ""}}'
+  DP_STAFF_PASSWORD: '{{.DP_STAFF_PASSWORD | default ""}}'
+
+env:
+
+tasks:
+  install:
+    desc: "Install dependencies ready for development on the codebase"
+    deps: [system-check]
+    run: once
+    cmds:
+      - cmd: poetry install -E plotting -E cloud
+    status:
+      - test -n "$POETRY_SKIP_INSTALL"
+
+  test:
+    desc: "Run self-contained tests"
+    deps: [install]
+    cmds:
+      - cmd: "{{.PYTEST}} -v tests"
+
+  build:
+    desc: "Build a package ready for a deploy"
+    cmds:
+      - cmd: poetry build -vv
+
+  publish:
+    desc: "Publish to PyPI"
+    cmds:
+      - cmd: poetry publish -vv
+
+  publish:dev:
+    desc: "Publish dev build to the CDN"
+    vars:
+      CDN_BUCKET: 'gs://datapane-static-hosting-prod/python-client/dev'
+    cmds:
+      - |
+        gsutil -h 'Cache-Control: no-cache, no-store, no-transform, max-age=0' \
+          cp dist/datapane-"$(poetry version -s)"-py3-none-any.whl \
+             '{{.CDN_BUCKET}}/datapane--py3-none-any.whl'
+    preconditions:
+      - sh: command -v gsutil
+        msg: "gsutil is not installed"
+      - sh: test -f dist/datapane-"$(poetry version -s)"-py3-none-any.whl
+        msg: Make sure you build the package first
+
+  system-check:
+    desc: Run checks to make sure you're ready for development
+    cmds:
+      - task: system-check:poetry
+
+  system-check:poetry:
+    run: once
+    preconditions:
+      - sh: command -v poetry
+        msg: >-
+          Poetry needs installing on your system: ->
+          https://python-poetry.org/docs/master/#installing-with-the-official-installer
+
+  vendor-update:
+    desc: "Update vendored dependencies"
+    cmds:
+      - |
+        poetry run vendoring sync
